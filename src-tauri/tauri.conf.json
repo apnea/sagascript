@@ -14,8 +14,7 @@
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
     },
-    "withGlobalTauri": true,
-    "macOSPrivateApi": true
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
@@ -29,6 +28,11 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
     },
     "windows": {
       "certificateThumbprint": null,
