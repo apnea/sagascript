@@ -1,8 +1,23 @@
 # Linux Port for Sagascript
 
-## Overview
+Hi Magnus, if you want to consider a Linux port for Sagascript, I have it working:
 
-This document details the changes made to port Sagascript from macOS/Windows to Linux.
+## Summary
+
+Core functionality tested on Ubuntu/X11/Gnome:
+- Audio recording
+- Local Whisper transcription (CPU - on my i5-14400 it's totally usable with the small EN model)
+- Clipboard copy
+- Auto-paste (using xdotool)
+- Global hotkeys
+- System tray integration
+- I've not been able to build or test on Mac or Windows since I don't have any available
+- The port was made with help from OpenCode and glm-4.7
+
+Two major workarounds were necessary:
+1. Overlay disabled due to app termination issue
+2. Paste uses xdotool instead of enigo due to X11 key mapping issues
+
 
 ## Files Changed
 
@@ -13,13 +28,13 @@ This document details the changes made to port Sagascript from macOS/Windows to 
 | `src-tauri/Cargo.toml` | **Modified** - Added Linux dependencies and updated description | +6 lines (2 sections) |
 | `src-tauri/src/commands.rs` | **Modified** - Added Linux platform identifier | +6 lines |
 | `src-tauri/src/overlay.rs` | **Modified** - Fixed X11 crashes and disabled overlay | +8 lines (3 sections) |
-| `src-tauri/src/paste/service.rs` | **Modified** - Fixed paste simulation on Linux using xdotool | +45 insertions, -23 deletions |
+| `src-tauri/src/paste/service.rs` | **Modified** - Fixed paste for terminals, updated xdotool usage | +47 insertions, -1 deletion |
 | `src-tauri/tauri.conf.json` | **Modified** - Removed macOS-only flag, added Linux bundle config | +8 lines, -1 line |
 | `src-tauri/gen/schemas/linux-schema.json` | **Generated** - Tauri auto-generated schema | 1 file |
 
 **Total**: 8 files created/modified, ~73 net lines added
 
-## Changes Made
+## Details
 
 ### 1. Platform Module (`src-tauri/src/platform/`)
 
@@ -120,12 +135,19 @@ pub fn show(_app: &tauri::AppHandle) {
 {
     use std::process::Command;
     info!("Using xdotool for paste on Linux");
+    // Try both Ctrl+V and Ctrl+Shift+V to handle different terminal paste shortcuts
+    // Some terminals (GNOME Terminal, tilix, etc.) use Ctrl+Shift+V instead of Ctrl+V
     let _ = Command::new("xdotool")
         .arg("key")
         .arg("ctrl+v")
         .status()
-        .map_err(|e| DictationError::PasteError(format!("xdotool failed: {e}")))?
-    info!("Paste keystroke simulated (xdotool)");
+        .map_err(|e| DictationError::PasteError(format!("xdotool Ctrl+V failed: {e}")))?
+    let _ = Command::new("xdotool")
+        .arg("key")
+        .arg("ctrl+shift+v")
+        .status()
+        .map_err(|e| DictationError::PasteError(format!("xdotool Ctrl+Shift+V failed: {e}")))?
+    info!("Paste keystrokes simulated (xdotool: Ctrl+V and Ctrl+Shift+V)");
     return Ok(());
 }
 
@@ -142,8 +164,12 @@ pub fn show(_app: &tauri::AppHandle) {
 
 **Explanation**:
 - **Problem**: `enigo::Key::Control` is unmapped in enigo's X11 backend, causing `modifier_no: 5 is unmapped` warning and failed paste
-- **Solution**: Use `xdotool` CLI tool directly to simulate Ctrl+V on Linux
+- **Problem**: Some terminals use Ctrl+Shift+V instead of Ctrl+V for pasting from system clipboard
+- **Solution**: Use `xdotool` CLI tool directly to simulate both Ctrl+V and Ctrl+Shift+V on Linux
 - **Architecture**: Made `enigo` imports conditional - only imported on macOS/Windows where they work
+- **Coverage**: Sending both shortcuts ensures auto-paste works in all terminal types:
+  - GNOME Terminal, tilix, rxvt-unicode (use Ctrl+Shift+V)
+  - xterm, urxvt, kitty, alacritty (use Ctrl+V)
 - **Requirement**: `xdotool` must be installed (`sudo apt-get install xdotool`)
 
 ### 6. Tauri Configuration (`src-tauri/tauri.conf.json`)
@@ -174,29 +200,6 @@ pub fn show(_app: &tauri::AppHandle) {
 
 ## Technical Notes
 
-### GPU Support
-
-All platforms use CPU-only transcription by default in this port:
-- **macOS**: `whisper-rs = { version = "0.15", features = ["coreml", "metal"] }` (GPU enabled)
-- **Windows**: `whisper-rs = { version = "0.15" }` (CPU only)
-- **Linux**: `whisper-rs = { version = "0.15" }` (CPU only)
-
-**Rationale**: GPU acceleration requires platform-specific dependencies:
-- macOS: CoreML/Metal (built into OS)
-- Windows: CUDA (requires NVIDIA toolkit, varies by hardware)
-- Linux: CUDA/OpenCL (varies by hardware, requires additional libraries)
-
-CPU transcription works but is slower. GPU support can be added as an optional feature later.
-
-### Clipboard Issues on Linux
-
-Logs show occasional clipboard timeout warnings:
-```
-WARN arboard::platform::linux::x11: Could not hand over clipboard contents over to clipboard manager. The request timed out.
-```
-
-**Explanation**: X11 clipboard manager communication can be slow or fail. This is a known limitation of `arboard` on X11. Despite the warning, clipboard operations typically succeed after retries or work fine.
-
 ### Window Manager Compatibility
 
 Linux has multiple window managers and compositors (KWin, Mutter, Xfwm, i3, etc.). The overlay crash and app termination issues are likely related to:
@@ -221,14 +224,15 @@ Linux has multiple window managers and compositors (KWin, Mutter, Xfwm, i3, etc.
 - ✅ Audio capture works (44100 Hz, 2 ch, F32)
 - ✅ Transcription works (Whisper Small EN model, CPU)
 - ✅ Clipboard copy works (text copied to clipboard)
-- ✅ Auto-paste uses xdotool to simulate Ctrl+V
+- ✅ Auto-paste works - sends both Ctrl+V and Ctrl+Shift+V to handle terminal paste shortcuts
+- ✅ Works in terminals using Ctrl+V (xterm, kitty, alacritty, etc.)
+- ✅ Works in terminals using Ctrl+Shift+V (GNOME Terminal, tilix, rxvt-unicode, etc.)
 
 ### Known Limitations
 1. **Overlay disabled on Linux** - Recording indicator doesn't show (workaround for app termination issue)
-2. **Paste simulation warning** - `arboard` occasionally reports clipboard timeout, but paste still works
-3. **CPU-only transcription** - No GPU acceleration on Linux (CPU transcription is functional but slower)
-4. **X11 only** - Not tested on Wayland (enigo/xdotool work on X11, may need Wayland equivalents like ydotool)
-5. **Overlay not click-through on Linux** - Window accepts mouse events (less than macOS but still functional)
+2. **CPU-only transcription** - No GPU acceleration on Linux (CPU transcription is functional but slower)
+3. **X11 only** - Not tested on Wayland (enigo/xdotool work on X11, may need Wayland equivalents like ydotool/wl-clipboard)
+4. **Overlay not click-through on Linux** - Window accepts mouse events (less than macOS but still functional)
 
 ## Installation
 
@@ -266,19 +270,3 @@ sudo dpkg -i src-tauri/target/release/bundle/deb/Sagascript_0.0.1_amd64.deb
 1. **Improve clipboard reliability** - Handle arboard timeout warnings more gracefully
 2. **Add overlay click-through on Linux** - Investigate X11 event forwarding
 3. **Add Linux-specific documentation** - Note Wayland requirements and GPU installation steps
-
-## Summary
-
-The port successfully brings Sagascript to Linux with core functionality working:
-- Audio recording
-- Local Whisper transcription (CPU)
-- Clipboard copy
-- Auto-paste (using xdotool)
-- Global hotkeys
-- System tray integration
-
-Two major workarounds were necessary:
-1. Overlay disabled due to app termination issue
-2. Paste uses xdotool instead of enigo due to X11 key mapping issues
-
-These are documented technical limitations that can be addressed in future PRs.
