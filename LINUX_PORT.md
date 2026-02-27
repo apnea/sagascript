@@ -130,7 +130,7 @@ pub fn show(_app: &tauri::AppHandle) {
 
 #### Fixed paste keyboard simulation on Linux
 ```rust
-// Linux: Use xdotool directly instead of enigo
+// Linux: Use xdotool directly instead of enigo (X11 key mapping issues)
 #[cfg(target_os = "linux")]
 {
     use std::process::Command;
@@ -167,10 +167,10 @@ pub fn show(_app: &tauri::AppHandle) {
 - **Problem**: Some terminals use Ctrl+Shift+V instead of Ctrl+V for pasting from system clipboard
 - **Solution**: Use `xdotool` CLI tool directly to simulate both Ctrl+V and Ctrl+Shift+V on Linux
 - **Architecture**: Made `enigo` imports conditional - only imported on macOS/Windows where they work
+- **Requirement**: `xdotool` must be installed (`sudo apt-get install xdotool`)
 - **Coverage**: Sending both shortcuts ensures auto-paste works in all terminal types:
   - GNOME Terminal, tilix, rxvt-unicode (use Ctrl+Shift+V)
   - xterm, urxvt, kitty, alacritty (use Ctrl+V)
-- **Requirement**: `xdotool` must be installed (`sudo apt-get install xdotool`)
 
 ### 6. Tauri Configuration (`src-tauri/tauri.conf.json`)
 
