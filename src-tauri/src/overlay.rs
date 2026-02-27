@@ -56,8 +56,20 @@ fn create_overlay(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Erro
     #[cfg(target_os = "macos")]
     configure_macos_window(&window);
 
+    // Linux: Don't apply advanced window attributes that cause X11 errors
+    // The combination of decorations(false) + transparent(true) + always_on_top(true)
+    // can cause BadImplementation errors on some X11 compositors
+    #[cfg(target_os = "linux")]
+    {
+        info!("Linux overlay: using default window configuration to avoid X11 errors");
+        // Skip advanced config on Linux - basic overlay still works
+    }
+
     // Click-through: cross-platform via Tauri API
-    let _ = window.set_ignore_cursor_events(true);
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window.set_ignore_cursor_events(true);
+    }
 
     // Suppress close — just hide instead
     let _ = window;
