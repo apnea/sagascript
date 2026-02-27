@@ -79,12 +79,19 @@ fn simulate_paste() -> Result<(), DictationError> {
     #[cfg(target_os = "linux")]
     {
         info!("Using xdotool for paste on Linux");
+        // Try both Ctrl+V and Ctrl+Shift+V to handle different terminal paste shortcuts
+        // Some terminals (GNOME Terminal, tilix, etc.) use Ctrl+Shift+V instead of Ctrl+V
         let _ = Command::new("xdotool")
             .arg("key")
             .arg("ctrl+v")
             .status()
-            .map_err(|e| DictationError::PasteError(format!("xdotool failed: {e}")))?;
-        info!("Paste keystroke simulated (xdotool)");
+            .map_err(|e| DictationError::PasteError(format!("xdotool Ctrl+V failed: {e}")))?;
+        let _ = Command::new("xdotool")
+            .arg("key")
+            .arg("ctrl+shift+v")
+            .status()
+            .map_err(|e| DictationError::PasteError(format!("xdotool Ctrl+Shift+V failed: {e}")))?;
+        info!("Paste keystrokes simulated (xdotool: Ctrl+V and Ctrl+Shift+V)");
         Ok(())
     }
 
