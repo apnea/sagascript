@@ -85,7 +85,7 @@ fn simulate_paste() -> Result<(), DictationError> {
             .status()
             .map_err(|e| DictationError::PasteError(format!("xdotool failed: {e}")))?;
         info!("Paste keystroke simulated (xdotool)");
-        return Ok(());
+        Ok(())
     }
 
     // macOS/Windows: Use enigo
@@ -115,7 +115,5 @@ fn simulate_paste() -> Result<(), DictationError> {
 
         info!("Paste keystroke simulated");
     }
-
-    Ok(())
 }
 

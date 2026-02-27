@@ -4,6 +4,7 @@ use tracing::{error, info};
 const OVERLAY_LABEL: &str = "overlay";
 
 /// Show the recording overlay window (create lazily on first call)
+#[cfg(not(target_os = "linux"))]
 pub fn show(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.show();
@@ -16,6 +17,12 @@ pub fn show(app: &tauri::AppHandle) {
             Err(e) => error!("Failed to create overlay: {e}"),
         }
     }
+}
+
+/// Linux: Overlay disabled due to app termination issue
+#[cfg(target_os = "linux")]
+pub fn show(_app: &tauri::AppHandle) {
+    info!("Overlay disabled on Linux (prevents app termination)");
 }
 
 /// Hide the recording overlay window
